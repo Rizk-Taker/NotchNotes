@@ -42,7 +42,7 @@ class SettingsWindowController: NSWindowController {
 
 struct SettingsView: View {
     @AppStorage("fileExtension") private var fileExtension: String = "md"
-    @AppStorage("autoRenameFromHeading") private var autoRenameFromHeading: Bool = false
+    @AppStorage("autosaveEnabled") private var autosaveEnabled: Bool = false
     @State private var folderPath: String = FolderSettings.shared.folderURL?.path ?? "No folder selected"
 
     var body: some View {
@@ -70,6 +70,13 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
             }
 
+            Section("Saving") {
+                Toggle("Auto-save", isOn: $autosaveEnabled)
+                Text("When enabled, notes auto-save 500ms after you stop typing.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+            }
+
             Section {
                 Button("How to Use Notch Notes") {
                     OnboardingWindowController.shared.showHowToUse()
@@ -77,6 +84,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 220)
+        .frame(width: 450, height: 280)
     }
 }

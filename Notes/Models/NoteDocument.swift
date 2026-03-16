@@ -29,10 +29,31 @@ class NoteDocument: Identifiable {
         return "Untitled"
     }
 
+    private var autoSaveTimer: Timer?
+
     func textDidChange(_ newText: String) {
         text = newText
         isDirty = true
         lastModified = Date()
+        scheduleAutoSaveIfEnabled()
+    }
+
+    private func scheduleAutoSaveIfEnabled() {
+        autoSaveTimer?.invalidate()
+        autoSaveTimer = nil
+        guard UserDefaults.standard.bool(forKey: "autosaveEnabled") else { return }
+        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+            self?.autoSave()
+        }
+    }
+
+    private func autoSave() {
+        guard isDirty else { return }
+        if fileURL != nil {
+            save()
+        } else if !text.isEmpty, FolderSettings.shared.folderURL != nil {
+            saveNew()
+        }
     }
 
     // MARK: - Save
@@ -41,6 +62,10 @@ class NoteDocument: Identifiable {
         guard isDirty, let url = fileURL else { return }
         FileService.shared.writeFile(text: text, to: url)
         isDirty = false
+    }
+
+    deinit {
+        autoSaveTimer?.invalidate()
     }
 
     func saveAs(url: URL) {

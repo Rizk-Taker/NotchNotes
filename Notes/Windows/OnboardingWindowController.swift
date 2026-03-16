@@ -79,6 +79,7 @@ struct OnboardingView: View {
 struct SetupPage: View {
     let onNext: () -> Void
     @AppStorage("fileExtension") private var fileExtension: String = "md"
+    @AppStorage("autosaveEnabled") private var autosaveEnabled: Bool = false
     @State private var folderPath: String = FolderSettings.shared.folderURL?.path ?? ""
 
     var body: some View {
@@ -135,6 +136,15 @@ struct SetupPage: View {
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
+                }
+
+                // Auto-save
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Auto-save notes", isOn: $autosaveEnabled)
+                        .font(.system(size: 13, weight: .medium))
+                    Text("When enabled, notes auto-save 500ms after you stop typing.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                 }
             }
             .padding(.horizontal, 40)
