@@ -67,11 +67,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // App menu
         let appMenuItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Notes", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About NotchPad", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "Quit Notes", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Quit NotchPad", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
         mainMenu.addItem(appMenuItem)
 
@@ -92,6 +92,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let splitHItem = NSMenuItem(title: "Split Horizontal", action: #selector(splitHorizontal), keyEquivalent: "d")
         splitHItem.keyEquivalentModifierMask = [.command, .shift]
         fileMenu.addItem(splitHItem)
+
+        fileMenu.addItem(withTitle: "Terminal Vertical", action: #selector(splitWithTerminalVertical), keyEquivalent: "t")
+        let terminalHItem = NSMenuItem(title: "Terminal Horizontal", action: #selector(splitWithTerminalHorizontal), keyEquivalent: "t")
+        terminalHItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(terminalHItem)
+
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Close Pane", action: #selector(closePane), keyEquivalent: "w")
         fileMenuItem.submenu = fileMenu
@@ -166,7 +172,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "Notes")
+            button.image = NSImage(systemSymbolName: "note.text", accessibilityDescription: "NotchPad")
         }
 
         let menu = NSMenu()
@@ -176,6 +182,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         statusItem?.menu = menu
+    }
+
+    // MARK: - Helpers
+
+    /// Returns the active note window controller, falling back from keyWindow → mainWindow → frontmost note window.
+    private func activeNoteController() -> NoteWindowController? {
+        if let window = NSApp.keyWindow, let controller = WindowTracker.shared.controller(for: window) {
+            return controller
+        }
+        if let window = NSApp.mainWindow, let controller = WindowTracker.shared.controller(for: window) {
+            return controller
+        }
+        // Fall back to the frontmost note window
+        for window in NSApp.orderedWindows {
+            if let controller = WindowTracker.shared.controller(for: window) {
+                return controller
+            }
+        }
+        return nil
     }
 
     // MARK: - Actions
@@ -202,32 +227,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func saveNote() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.saveFocusedPane()
     }
 
     @objc private func saveNoteAs() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.saveFocusedPaneAs()
     }
 
     @objc private func splitVertical() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.splitFocusedPane(orientation: .vertical)
     }
 
     @objc private func splitHorizontal() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.splitFocusedPane(orientation: .horizontal)
     }
 
+    @objc private func splitWithTerminalVertical() {
+        guard let controller = activeNoteController() else { return }
+        controller.splitFocusedPaneWithTerminal(orientation: .vertical)
+    }
+
+    @objc private func splitWithTerminalHorizontal() {
+        guard let controller = activeNoteController() else { return }
+        controller.splitFocusedPaneWithTerminal(orientation: .horizontal)
+    }
+
     @objc private func closePane() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.closeFocusedPane()
     }
 
@@ -240,38 +270,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func zoomIn() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.adjustFontSize(delta: 1)
     }
 
     @objc private func zoomOut() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.adjustFontSize(delta: -1)
     }
 
     @objc private func focusLeft() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.moveFocus(direction: .left)
     }
 
     @objc private func focusRight() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.moveFocus(direction: .right)
     }
 
     @objc private func focusUp() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.moveFocus(direction: .top)
     }
 
     @objc private func focusDown() {
-        guard let window = NSApp.keyWindow,
-              let controller = WindowTracker.shared.controller(for: window) else { return }
+        guard let controller = activeNoteController() else { return }
         controller.moveFocus(direction: .bottom)
     }
 }

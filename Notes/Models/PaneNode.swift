@@ -32,7 +32,7 @@ indirect enum PaneNode: Identifiable {
     func findLeaf(documentID: UUID) -> PaneLeaf? {
         switch self {
         case .leaf(let leaf):
-            return leaf.document.id == documentID ? leaf : nil
+            return leaf.document?.id == documentID ? leaf : nil
         case .split(let split):
             return split.first.findLeaf(documentID: documentID)
                 ?? split.second.findLeaf(documentID: documentID)
@@ -82,13 +82,34 @@ indirect enum PaneNode: Identifiable {
     }
 }
 
+enum PaneContent {
+    case editor(NoteDocument)
+    case terminal
+}
+
 struct PaneLeaf: Identifiable {
     let id: UUID
-    var document: NoteDocument
+    var content: PaneContent
 
     init(id: UUID = UUID(), document: NoteDocument) {
         self.id = id
-        self.document = document
+        self.content = .editor(document)
+    }
+
+    init(id: UUID = UUID(), terminal: Bool) {
+        self.id = id
+        self.content = .terminal
+    }
+
+    /// Convenience accessor — returns nil for terminal panes
+    var document: NoteDocument? {
+        if case .editor(let doc) = content { return doc }
+        return nil
+    }
+
+    var isTerminal: Bool {
+        if case .terminal = content { return true }
+        return false
     }
 }
 

@@ -103,14 +103,22 @@ class NotchMonitor {
         // Global monitor: fires when the app is NOT focused
         enterKeyGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 36 {
-                self?.createNoteFromNotch()
+                if event.modifierFlags.contains([.command, .shift]) {
+                    self?.createTerminalFromNotch()
+                } else {
+                    self?.createNoteFromNotch()
+                }
             }
         }
 
         // Local monitor: fires when the app IS focused — intercepts Enter before the text view
         enterKeyLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 36 {
-                self?.createNoteFromNotch()
+                if event.modifierFlags.contains([.command, .shift]) {
+                    self?.createTerminalFromNotch()
+                } else {
+                    self?.createNoteFromNotch()
+                }
                 return nil  // Swallow the event so the text view doesn't get it
             }
             return event
@@ -131,6 +139,11 @@ class NotchMonitor {
     private func createNoteFromNotch() {
         hideTrigger()
         WindowTracker.shared.createNewNote()
+    }
+
+    private func createTerminalFromNotch() {
+        hideTrigger()
+        WindowTracker.shared.createNewTerminal()
     }
 
     deinit {

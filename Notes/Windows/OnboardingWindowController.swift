@@ -14,12 +14,12 @@ class OnboardingWindowController: NSWindowController {
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Welcome to Notch Notes"
+        window.title = "Welcome to NotchPad"
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -70,7 +70,7 @@ struct OnboardingView: View {
                 InstructionsPage(onDone: dismiss)
             }
         }
-        .frame(width: 520, height: 420)
+        .frame(width: 520, height: 560)
     }
 }
 
@@ -86,7 +86,7 @@ struct SetupPage: View {
         VStack(spacing: 0) {
             Spacer().frame(height: 40)
 
-            Text("Welcome to Notch Notes")
+            Text("Welcome to NotchPad")
                 .font(.system(size: 24, weight: .bold))
 
             Text("Let's get you set up")
@@ -173,46 +173,44 @@ struct InstructionsPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: 40)
+            Spacer().frame(height: 32)
 
             Text("How to Use")
                 .font(.system(size: 24, weight: .bold))
 
             Spacer().frame(height: 24)
 
-            VStack(alignment: .leading, spacing: 16) {
-                instructionRow(
-                    keys: "Notch hover + Enter",
-                    description: "Hover your cursor over the MacBook notch. A prompt appears — press Enter to create a new note."
-                )
-                instructionRow(
-                    keys: "⌘ N",
-                    description: "Create a new note from anywhere in the app."
-                )
-                instructionRow(
-                    keys: "⌘ D",
-                    description: "Split the current pane vertically (side by side)."
-                )
-                instructionRow(
-                    keys: "⇧⌘ D",
-                    description: "Split the current pane horizontally (stacked)."
-                )
-                instructionRow(
-                    keys: "⌥⌘ Arrow Keys",
-                    description: "Move focus between panes."
-                )
-                instructionRow(
-                    keys: "⌘ S",
-                    description: "Save the current note. Filename is based on the first line."
-                )
-                instructionRow(
-                    keys: "⌘ W",
-                    description: "Close the focused pane. Prompts to save if unsaved (Y/N)."
-                )
-                instructionRow(
-                    keys: "⌘ + / ⌘ -",
-                    description: "Increase or decrease font size."
-                )
+            VStack(alignment: .leading, spacing: 20) {
+                // Creating Notes
+                sectionBlock(title: "Creating Notes") {
+                    instructionRow(keys: "Notch + Enter", description: "Hover the notch, press Enter")
+                    instructionRow(keys: "⌘ N", description: "New note from anywhere")
+                }
+
+                // Splitting Panes
+                sectionBlock(title: "Note Panes") {
+                    instructionRow(keys: "⌘ D", description: "Split vertically (side by side)")
+                    instructionRow(keys: "⇧⌘ D", description: "Split horizontally (stacked)")
+                }
+
+                // Terminal Panes
+                sectionBlock(title: "Terminal Panes") {
+                    instructionRow(keys: "Notch + ⇧⌘ Enter", description: "New terminal window from notch")
+                    instructionRow(keys: "⌘ T", description: "Terminal split vertical")
+                    instructionRow(keys: "⇧⌘ T", description: "Terminal split horizontal")
+                }
+
+                // Navigation
+                sectionBlock(title: "Navigation") {
+                    instructionRow(keys: "⌥⌘ Arrows", description: "Move focus between panes")
+                    instructionRow(keys: "⌘ W", description: "Close pane")
+                }
+
+                // Saving
+                sectionBlock(title: "Saving") {
+                    instructionRow(keys: "⌘ S", description: "Save — filename from first line")
+                    instructionRow(keys: "⇧⌘ S", description: "Save As — choose location")
+                }
             }
             .padding(.horizontal, 40)
 
@@ -232,11 +230,22 @@ struct InstructionsPage: View {
         }
     }
 
+    private func sectionBlock<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.primary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+            content()
+        }
+    }
+
     private func instructionRow(keys: String, description: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text(keys)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .frame(width: 150, alignment: .trailing)
+                .frame(width: 120, alignment: .trailing)
                 .foregroundStyle(.primary)
 
             Text(description)

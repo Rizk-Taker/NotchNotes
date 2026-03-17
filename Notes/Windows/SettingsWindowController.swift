@@ -14,7 +14,7 @@ class SettingsWindowController: NSWindowController {
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 450, height: 250),
+            contentRect: NSRect(x: 0, y: 0, width: 450, height: 600),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -47,6 +47,13 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Button("How to Use NotchPad") {
+                    OnboardingWindowController.shared.showHowToUse()
+                }
+                .font(.headline)
+            }
+
             Section("Notes Folder") {
                 HStack {
                     Text(folderPath)
@@ -62,14 +69,6 @@ struct SettingsView: View {
                 }
             }
 
-            Section("File Format") {
-                Picker("Default extension", selection: $fileExtension) {
-                    Text(".md (Markdown)").tag("md")
-                    Text(".txt (Plain Text)").tag("txt")
-                }
-                .pickerStyle(.radioGroup)
-            }
-
             Section("Saving") {
                 Toggle("Auto-save", isOn: $autosaveEnabled)
                 Text("When enabled, notes auto-save 500ms after you stop typing.")
@@ -77,13 +76,16 @@ struct SettingsView: View {
                     .foregroundStyle(.tertiary)
             }
 
-            Section {
-                Button("How to Use Notch Notes") {
-                    OnboardingWindowController.shared.showHowToUse()
+            Section("File Format") {
+                Picker("", selection: $fileExtension) {
+                    Text(".md (Markdown)").tag("md")
+                    Text(".txt (Plain Text)").tag("txt")
                 }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 280)
+        .frame(width: 450, height: 420)
     }
 }

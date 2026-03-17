@@ -21,22 +21,29 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
     init(document: NoteDocument) {
         self.windowState = WindowState(document: document)
 
+        let windowWidth: CGFloat = 700
+        let windowHeight: CGFloat = 500
+
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.minSize = NSSize(width: 250, height: 200)
-        window.title = document.fileURL != nil ? document.displayName : "Notes"
+        window.title = document.fileURL != nil ? document.displayName : "NotchPad"
         window.isReleasedWhenClosed = false
 
         super.init(window: window)
         window.delegate = self
 
-        // Cascade position
-        let point = window.cascadeTopLeft(from: Self.cascadePoint)
-        Self.cascadePoint = point
+        // Position centered horizontally, near the top of the screen (below notch)
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+            let x = screenFrame.midX - windowWidth / 2
+            let y = screenFrame.maxY - windowHeight - 40
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        }
 
         setupContentView()
         observeWindowMove()
@@ -52,7 +59,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.minSize = NSSize(width: 250, height: 200)
-        window.title = windowState.focusedDocument?.fileURL != nil ? windowState.focusedDocument?.displayName ?? "Notes" : "Notes"
+        window.title = windowState.focusedDocument?.fileURL != nil ? windowState.focusedDocument?.displayName ?? "NotchPad" : "NotchPad"
         window.isReleasedWhenClosed = false
 
         super.init(window: window)
@@ -83,19 +90,36 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - Focus
 
     func editorDidFocus(_ editor: NoteEditorView) {
-        // Find the leaf ID for this editor
         if let entry = paneTreeView?.editorViews.first(where: { $0.value === editor }) {
             windowState.focusedLeafID = entry.key
-            // Update focus indicators
-            for (id, editorView) in paneTreeView?.editorViews ?? [:] {
-                editorView.isFocused = (id == entry.key)
-            }
+            updateAllFocusIndicators(focusedID: entry.key)
             updateTitle()
         }
     }
 
+    func terminalDidFocus(_ terminal: TerminalPaneView) {
+        if let entry = paneTreeView?.terminalViews.first(where: { $0.value === terminal }) {
+            windowState.focusedLeafID = entry.key
+            updateAllFocusIndicators(focusedID: entry.key)
+            updateTitle()
+        }
+    }
+
+    private func updateAllFocusIndicators(focusedID: UUID) {
+        for (id, editorView) in paneTreeView?.editorViews ?? [:] {
+            editorView.isFocused = (id == focusedID)
+        }
+        for (id, terminalView) in paneTreeView?.terminalViews ?? [:] {
+            terminalView.isFocused = (id == focusedID)
+        }
+    }
+
     private func updateTitle() {
-        window?.title = windowState.focusedDocument?.fileURL != nil ? (windowState.focusedDocument?.displayName ?? "Notes") : "Notes"
+        if let leaf = windowState.focusedLeaf, leaf.isTerminal {
+            window?.title = "NotchPad — Terminal"
+        } else {
+            window?.title = windowState.focusedDocument?.fileURL != nil ? (windowState.focusedDocument?.displayName ?? "NotchPad") : "NotchPad"
+        }
     }
 
     // MARK: - Pane Navigation (⌥⌘ Arrow Keys)
@@ -117,9 +141,11 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         windowState.focusedLeafID = targetLeaf.id
         rebuildContentView()
 
-        // Focus the text view
+        // Focus the appropriate view type
         if let editor = paneTreeView?.editorViews[targetLeaf.id] {
             editor.focus()
+        } else if let terminal = paneTreeView?.terminalViews[targetLeaf.id] {
+            terminal.focus()
         }
     }
 
@@ -136,6 +162,18 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         if let newLeafID = windowState.focusedLeafID,
            let editor = paneTreeView?.editorViews[newLeafID] {
             editor.focus()
+        }
+    }
+
+    func splitFocusedPaneWithTerminal(orientation: SplitOrientation) {
+        guard let leafID = windowState.focusedLeafID else { return }
+        let edge: DockEdge = (orientation == .vertical) ? .right : .bottom
+        windowState.dockTerminal(onto: leafID, edge: edge)
+        rebuildContentView()
+
+        if let newLeafID = windowState.focusedLeafID,
+           let terminal = paneTreeView?.terminalViews[newLeafID] {
+            terminal.focus()
         }
     }
 
@@ -172,10 +210,16 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
 
     func closeFocusedPane() {
         guard let leafID = windowState.focusedLeafID else { return }
-        guard let doc = windowState.focusedDocument else { return }
+        guard let leaf = windowState.focusedLeaf else { return }
 
+        // Terminal panes close immediately
+        if leaf.isTerminal {
+            removePane(leafID: leafID)
+            return
+        }
+
+        guard let doc = leaf.document else { return }
         if doc.isDirty && !doc.text.isEmpty {
-            // Show keyboard-driven save prompt
             promptSaveBeforeClose(doc: doc) { [weak self] shouldProceed in
                 guard shouldProceed, let self else { return }
                 self.removePane(leafID: leafID)
@@ -292,25 +336,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         // This is also handled via NotificationCenter observer above
     }
 
-    // Override to detect mouse up after window move (for docking completion)
-    override func showWindow(_ sender: Any?) {
-        super.showWindow(sender)
-        setupMouseUpMonitor()
-    }
-
-    private var mouseUpMonitor: Any?
-
-    private func setupMouseUpMonitor() {
-        mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
-            guard let self else { return event }
-            DockingManager.shared.windowDidEndMove(self)
-            return event
-        }
-    }
-
     deinit {
-        if let monitor = mouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
+        // Cleanup handled by windowWillClose
     }
 }

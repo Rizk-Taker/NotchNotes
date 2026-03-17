@@ -14,6 +14,8 @@ class PaneTreeView: NSView {
 
     /// All leaf editor views in this tree (for focus management)
     private(set) var editorViews: [UUID: NoteEditorView] = [:]
+    /// All leaf terminal views in this tree (for focus management)
+    private(set) var terminalViews: [UUID: TerminalPaneView] = [:]
 
     init(node: PaneNode, windowController: NoteWindowController?) {
         self.node = node
@@ -28,18 +30,24 @@ class PaneTreeView: NSView {
 
     func update(node: PaneNode, focusedLeafID: UUID?) {
         self.node = node
+        // Cache terminal views so shell sessions survive rebuilds
+        let previousTerminals = terminalViews
         // Rebuild the view hierarchy
         subviews.forEach { $0.removeFromSuperview() }
         editorViews.removeAll()
-        buildView()
+        terminalViews.removeAll()
+        buildView(previousTerminals: previousTerminals)
         // Update focus indicators
         for (id, editor) in editorViews {
             editor.isFocused = (id == focusedLeafID)
         }
+        for (id, terminal) in terminalViews {
+            terminal.isFocused = (id == focusedLeafID)
+        }
     }
 
-    private func buildView() {
-        let child = createView(for: node)
+    private func buildView(previousTerminals: [UUID: TerminalPaneView] = [:]) {
+        let child = createView(for: node, previousTerminals: previousTerminals)
         addSubview(child)
         child.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -50,12 +58,20 @@ class PaneTreeView: NSView {
         ])
     }
 
-    private func createView(for node: PaneNode) -> NSView {
+    private func createView(for node: PaneNode, previousTerminals: [UUID: TerminalPaneView]) -> NSView {
         switch node {
         case .leaf(let leaf):
-            let editor = NoteEditorView(document: leaf.document)
-            editorViews[leaf.id] = editor
-            return editor
+            switch leaf.content {
+            case .editor(let document):
+                let editor = NoteEditorView(document: document)
+                editorViews[leaf.id] = editor
+                return editor
+            case .terminal:
+                // Reuse existing terminal view to preserve the shell session
+                let terminal = previousTerminals[leaf.id] ?? TerminalPaneView()
+                terminalViews[leaf.id] = terminal
+                return terminal
+            }
 
         case .split(let split):
             let splitView = PaneSplitView(
@@ -63,8 +79,8 @@ class PaneTreeView: NSView {
                 ratio: split.ratio,
                 splitID: split.id
             )
-            let firstView = createView(for: split.first)
-            let secondView = createView(for: split.second)
+            let firstView = createView(for: split.first, previousTerminals: previousTerminals)
+            let secondView = createView(for: split.second, previousTerminals: previousTerminals)
             splitView.setViews(first: firstView, second: secondView)
             return splitView
         }
