@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NotchNotes — Capture the thought before it drifts</title>
+  <meta name="description" content="Hover your MacBook's notch, press Enter, start writing. A native macOS editor with split panes and a built-in terminal.">
+  <link rel="icon" type="image/png" href="icon.png">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --text: #1a1a1a;
+      --text-secondary: #888;
+      --text-tertiary: #bbb;
+      --link: #555;
+      --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+      --mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      --blue: #4a9eff;
+      --green: #4ade80;
+      --red: #ff5f57;
+      --yellow: #febc2e;
+      --green-dot: #28c840;
+    }
+
+    html {
+      background: #f4efe6;
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Paper grain texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.35;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+      mix-blend-mode: multiply;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ─── ANIMATIONS ─── */
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes wordReveal {
+      from { opacity: 0; filter: blur(6px); transform: translateY(6px); }
+      to { opacity: 1; filter: blur(0); transform: translateY(0); }
+    }
+
+    @keyframes iconReveal {
+      from { opacity: 0; transform: scale(0.88); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0s !important;
+      }
+    }
+
+    /* ─── NOTCH ─── */
+
+    .notch-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 36px;
+      display: flex;
+      justify-content: center;
+      z-index: 10000;
+      pointer-events: none;
+    }
+
+    .notch {
+      position: relative;
+      width: 200px;
+      height: 32px;
+      background: #000;
+      border-radius: 0 0 16px 16px;
+      cursor: pointer;
+      pointer-events: all;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      transition: height 0.2s ease-out;
+    }
+
+    .notch:hover,
+    .notch.active {
+      height: 62px;
+    }
+
+    .notch-label {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0);
+      padding-bottom: 8px;
+      transition: color 0.2s ease-out 0.05s;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .notch:hover .notch-label,
+    .notch.active .notch-label {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Subtle shadow under notch */
+    .notch::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 140px;
+      height: 12px;
+      background: radial-gradient(ellipse, rgba(0, 0, 0, 0.06) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+
+    .notch:hover::after,
+    .notch.active::after {
+      opacity: 1;
+    }
+
+    /* ─── HEADER ─── */
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 40px;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      flex-shrink: 0;
+    }
+
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      padding: 7px 16px 7px 10px;
+      border: 1.5px solid #1a1a1a;
+      border-radius: 12px;
+      color: var(--text);
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+    }
+
+    .wordmark svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .header-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
+    }
+
+    .header-links a {
+      color: var(--text-secondary);
+      transition: color 0.2s ease;
+    }
+
+    .header-links a:hover { color: var(--text); }
+
+    .header-links .sep {
+      color: var(--text-tertiary);
+      user-select: none;
+    }
+
+    /* ─── HERO ─── */
+
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 40px 48px;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      min-height: calc(100vh - 120px);
+    }
+
+    .tagline {
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.1;
+      max-width: 560px;
+      margin-bottom: 16px;
+    }
+
+    .tagline .word {
+      display: inline-block;
+      opacity: 0;
+      filter: blur(6px);
+      animation: wordReveal 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: calc(0.18s + var(--i) * 0.065s);
+    }
+
+    .subtitle {
+      font-size: 17px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 420px;
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.52s forwards;
+    }
+
+    .app-icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 26px;
+      margin-bottom: 40px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+      opacity: 0;
+      animation: iconReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.62s forwards;
+    }
+
+    .download-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      border-bottom: 1.5px solid var(--text-tertiary);
+      padding-bottom: 2px;
+      transition: border-color 0.2s ease;
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.74s forwards;
+    }
+
+    .download-link:hover { border-color: var(--text); }
+
+    .download-link svg { position: relative; top: -1px; }
+
+    .download-meta {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-tertiary);
+      letter-spacing: 0.02em;
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+    }
+
+    .hint {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-top: 32px;
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.88s forwards;
+      transition: opacity 0.3s;
+    }
+
+    .hint-arrow {
+      display: inline-block;
+      animation: bounce-up 1.5s ease-in-out infinite;
+    }
+
+    @keyframes bounce-up {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    /* ─── GHOST CURSOR ─── */
+
+    .ghost-cursor {
+      position: fixed;
+      z-index: 10001;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .ghost-cursor svg {
+      width: 18px;
+      height: 22px;
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15));
+    }
+
+    @keyframes cursorFloat {
+      0% {
+        opacity: 0;
+        transform: translate(-30px, 60px);
+      }
+      12% {
+        opacity: 0.55;
+        transform: translate(-20px, 40px);
+      }
+      40% {
+        opacity: 0.55;
+        transform: translate(-4px, 6px);
+      }
+      52% {
+        opacity: 0.55;
+        transform: translate(0px, 0px);
+      }
+      /* pause at notch */
+      68% {
+        opacity: 0.45;
+        transform: translate(0px, 0px);
+      }
+      82% {
+        opacity: 0.2;
+        transform: translate(0px, -4px);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(0px, -4px);
+      }
+    }
+
+    .ghost-cursor.animating {
+      animation: cursorFloat 2.8s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    }
+
+    /* Notch peek — triggered by JS class */
+    .notch.peeking {
+      height: 48px;
+      transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .notch.peeking .notch-label {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* ─── FEATURES ─── */
+
+    .features {
+      padding: 60px 40px 80px;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .features-heading {
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .feature-list {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .feature {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    .feature h3 {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 4px;
+    }
+
+    .feature p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .feature kbd {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-top: 4px;
+      color: var(--text-secondary);
+    }
+
+    .features-divider {
+      width: 40px;
+      height: 1px;
+      background: var(--text-tertiary);
+      margin: 0 auto;
+      opacity: 0.5;
+    }
+
+    /* ─── FOOTER ─── */
+
+    .bottom {
+      flex-shrink: 0;
+      padding: 20px 40px;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .bottom a {
+      color: var(--text-secondary);
+      transition: color 0.2s ease;
+    }
+
+    .bottom a:hover { color: var(--text); }
+
+    /* ─── BACKDROP ─── */
+
+    .backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(244, 239, 230, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 8000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .backdrop.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ─── MAC WINDOW ─── */
+
+    .window-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9000;
+      pointer-events: none;
+      padding: 24px;
+    }
+
+    .mac-window {
+      width: min(720px, 90vw);
+      height: min(440px, 65vh);
+      background: #1e1e2e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow:
+        0 25px 80px rgba(0, 0, 0, 0.25),
+        0 0 0 1px rgba(0, 0, 0, 0.1);
+      transform: scale(0) translateY(-80px);
+      opacity: 0;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.35s ease-out;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mac-window.visible {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .mac-window.dismissing {
+      transform: scale(0.96) translateY(8px);
+      opacity: 0;
+      transition: transform 0.2s ease-in, opacity 0.15s ease-in;
+    }
+
+    .title-bar {
+      height: 38px;
+      background: #181828;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      user-select: none;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 8px;
+      margin-right: 16px;
+    }
+
+    .traffic-light {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .traffic-light.close { background: var(--red); }
+    .traffic-light.minimize { background: var(--yellow); }
+    .traffic-light.zoom { background: var(--green-dot); }
+
+    .title-bar-text {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.4);
+      flex: 1;
+      text-align: center;
+      margin-right: 68px;
+    }
+
+    .editor-area {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .pane {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .focus-bar {
+      width: 2px;
+      background: var(--blue);
+      flex-shrink: 0;
+    }
+
+    .pane-divider {
+      width: 2px;
+      background: rgba(255, 255, 255, 0.06);
+      flex-shrink: 0;
+    }
+
+    .editor-content {
+      flex: 1;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: #c8c8d8;
+      background: #1e1e2e;
+      white-space: pre-wrap;
+      overflow: hidden;
+    }
+
+    .editor-content .heading {
+      color: #e8e8f0;
+      font-weight: 600;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 1.5px;
+      height: 1.1em;
+      background: var(--blue);
+      vertical-align: text-bottom;
+      animation: blink 1s step-end infinite;
+    }
+
+    .terminal-content {
+      flex: 1;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #c8c8d8;
+      background: #0e0e1e;
+      overflow: hidden;
+    }
+
+    .terminal-content .prompt { color: var(--green); }
+    .terminal-content .cmd { color: #e8e8f0; }
+    .terminal-content .output { color: #666; }
+
+    /* ─── DISMISS HINT ─── */
+
+    .dismiss-hint {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-tertiary);
+      z-index: 9500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .dismiss-hint.visible {
+      opacity: 1;
+    }
+
+    /* ─── SCROLL SECTIONS FADE ─── */
+
+    .reveal {
+      opacity: 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .scroll-reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .scroll-reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ─── RESPONSIVE ─── */
+
+    @media (max-width: 540px) {
+      header { padding: 24px 24px; }
+      .hero { padding: 0 24px 24px; }
+      .features { padding: 40px 24px 60px; }
+      .bottom { padding: 16px 24px; }
+
+      .app-icon {
+        width: 88px;
+        height: 88px;
+        border-radius: 20px;
+        margin-bottom: 32px;
+      }
+
+      .notch-bar { display: none; }
+      .hint { display: none; }
+
+      .mac-window {
+        width: 95vw;
+        height: 320px;
+        position: relative;
+        transform: scale(1) translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .window-container {
+        position: relative;
+        pointer-events: auto;
+        padding: 0 12px;
+        margin-top: 24px;
+        margin-bottom: 24px;
+        z-index: 1;
+      }
+
+      .editor-area { flex-direction: column; }
+      .pane-divider { width: 100%; height: 2px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fixed notch -->
+  <div class="notch-bar">
+    <div class="notch" id="notch">
+      <span class="notch-label">press enter to create</span>
+    </div>
+  </div>
+
+  <!-- Ghost cursor hint -->
+  <div class="ghost-cursor" id="ghost-cursor">
+    <svg viewBox="0 0 20 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 1l6.5 19.5L10 14l6.5 2.5L1 1z" fill="#1a1a1a" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <!-- Backdrop -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- Floating window -->
+  <div class="window-container" id="window-container">
+    <div class="mac-window" id="mac-window">
+      <div class="title-bar">
+        <div class="traffic-lights">
+          <div class="traffic-light close"></div>
+          <div class="traffic-light minimize"></div>
+          <div class="traffic-light zoom"></div>
+        </div>
+        <span class="title-bar-text">NotchNotes</span>
+      </div>
+      <div class="editor-area">
+        <div class="pane">
+          <div class="focus-bar"></div>
+          <div class="editor-content" id="editor-text"></div>
+        </div>
+        <div class="pane-divider"></div>
+        <div class="pane">
+          <div class="terminal-content" id="terminal-text"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dismiss hint -->
+  <div class="dismiss-hint" id="dismiss-hint">esc to close</div>
+
+  <!-- Header -->
+  <header>
+    <a href="/" class="wordmark">
+      <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="18" height="18" rx="4" fill="#1a1a1a"/>
+        <path d="M6 4h8v1.5H6z" fill="#f4efe6" opacity="0.15"/>
+        <rect x="5" y="7" width="10" height="1" rx="0.5" fill="#f4efe6" opacity="0.6"/>
+        <rect x="5" y="9.5" width="8" height="1" rx="0.5" fill="#f4efe6" opacity="0.4"/>
+        <rect x="5" y="12" width="10" height="1" rx="0.5" fill="#f4efe6" opacity="0.6"/>
+        <text x="5.5" y="17" font-family="monospace" font-size="4" fill="#4ade80" opacity="0.8">&gt;_</text>
+      </svg>
+      notchnotes
+    </a>
+    <div class="header-links">
+      <a href="https://github.com/nickrizk/Notes">github</a>
+      <span class="sep">|</span>
+      <a href="https://github.com/nickrizk/Notes/releases">releases</a>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1 class="tagline">
+      <span class="word" style="--i: 0">Hover</span>
+      <span class="word" style="--i: 1">the</span>
+      <span class="word" style="--i: 2">notch.</span>
+      <span class="word" style="--i: 3">Press</span>
+      <span class="word" style="--i: 4">enter.</span>
+      <span class="word" style="--i: 5">Write.</span>
+    </h1>
+
+    <p class="subtitle">A native macOS editor that lives in your MacBook's notch. Split panes, built-in terminal, auto-save. Everything stays local.</p>
+
+    <a href="https://github.com/nickrizk/Notes/releases">
+      <img src="icon.png" alt="NotchNotes" class="app-icon">
+    </a>
+
+    <a href="https://github.com/nickrizk/Notes/releases" class="download-link">
+      Download for macOS
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </a>
+
+    <p class="download-meta">macOS 13+ &middot; Apple Silicon &amp; Intel</p>
+
+    <p class="hint"><span class="hint-arrow">&uarr;</span> try it &mdash; hover the notch above</p>
+  </section>
+
+  <!-- Divider -->
+  <div class="features-divider"></div>
+
+  <!-- Features -->
+  <section class="features scroll-reveal">
+    <h2 class="features-heading">Built for speed</h2>
+    <div class="feature-list">
+      <div class="feature">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div>
+          <h3>Notch-triggered</h3>
+          <p>Move your cursor to the notch, press Enter. A new note window appears instantly, focused and ready.</p>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+        </div>
+        <div>
+          <h3>Split panes</h3>
+          <p>Split vertically or horizontally, iTerm2-style. Nest splits, navigate with keyboard shortcuts, drag dividers to resize.</p>
+          <kbd>&#8984;D</kbd> <kbd>&#8984;&#8679;D</kbd>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </div>
+        <div>
+          <h3>Built-in terminal</h3>
+          <p>Full shell right next to your notes. xterm-256color, your environment, your shell. Open a terminal pane anywhere.</p>
+          <kbd>&#8984;T</kbd> <kbd>&#8984;&#8679;T</kbd>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+        </div>
+        <div>
+          <h3>Window docking</h3>
+          <p>Drag a window onto another to merge them. Directional drop zones highlight where the pane will land.</p>
+        </div>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        </div>
+        <div>
+          <h3>Auto-save</h3>
+          <p>Notes save as you type. Smart filenames from your first line. Choose markdown or plain text.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bottom">
+    built by <a href="https://github.com/nickrizk">nick rizk</a> &middot; <a href="https://github.com/nickrizk/Notes">source</a>
+  </footer>
+
+  <script>
+    const notch = document.getElementById('notch');
+    const macWindow = document.getElementById('mac-window');
+    const backdrop = document.getElementById('backdrop');
+    const dismissHint = document.getElementById('dismiss-hint');
+    const editorText = document.getElementById('editor-text');
+    const terminalText = document.getElementById('terminal-text');
+    const hint = document.querySelector('.hint');
+    const ghostCursor = document.getElementById('ghost-cursor');
+
+    let notchHovered = false;
+    let windowOpen = false;
+    let typingStarted = false;
+    let hintStopped = false;
+    let hintLoops = 0;
+    const MAX_HINT_LOOPS = 3;
+
+    // Notch hover
+    notch.addEventListener('mouseenter', () => {
+      stopHintLoop();
+      notchHovered = true;
+      notch.classList.add('active');
+    });
+
+    notch.addEventListener('mouseleave', () => {
+      setTimeout(() => {
+        if (!windowOpen) {
+          notchHovered = false;
+          notch.classList.remove('active');
+        }
+      }, 100);
+    });
+
+    // Enter → open, Escape → close
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && notchHovered && !windowOpen) {
+        e.preventDefault();
+        openWindow();
+      } else if (e.key === 'Escape' && windowOpen) {
+        e.preventDefault();
+        closeWindow();
+      }
+    });
+
+    backdrop.addEventListener('click', closeWindow);
+    notch.addEventListener('click', () => { if (!windowOpen) openWindow(); });
+
+    function openWindow() {
+      windowOpen = true;
+      notchHovered = false;
+      stopHintLoop();
+      notch.classList.remove('active');
+      if (hint) hint.style.opacity = '0';
+
+      backdrop.classList.add('visible');
+      macWindow.classList.remove('dismissing');
+      macWindow.classList.add('visible');
+      dismissHint.classList.add('visible');
+
+      if (!typingStarted) {
+        typingStarted = true;
+        setTimeout(() => { typeEditor(); typeTerminal(); }, 450);
+      }
+    }
+
+    function closeWindow() {
+      windowOpen = false;
+      backdrop.classList.remove('visible');
+      macWindow.classList.add('dismissing');
+      macWindow.classList.remove('visible');
+      dismissHint.classList.remove('visible');
+    }
+
+    // ─── Typing animations ───
+
+    const editorLines = [
+      { text: '# Meeting Notes', cls: 'heading' },
+      { text: '', cls: '' },
+      { text: 'Project sync with the team.', cls: '' },
+      { text: '', cls: '' },
+      { text: '## Action Items', cls: 'heading' },
+      { text: '- Ship landing page by Friday', cls: '' },
+      { text: '- Review PR #42 for auth changes', cls: '' },
+      { text: '- Set up staging environment', cls: '' },
+      { text: '', cls: '' },
+      { text: '## Notes', cls: 'heading' },
+      { text: 'Split pane workflow is working', cls: '' },
+      { text: 'great — terminal on the right,', cls: '' },
+      { text: 'notes on the left.', cls: '' },
+    ];
+
+    const terminalLines = [
+      { text: 'nick@macbook ~ % ', cls: 'prompt', cmd: 'ls ~/notes' },
+      { text: 'meeting-notes.md  ideas.md  todo.md', cls: 'output' },
+      { text: '', cls: '' },
+      { text: 'nick@macbook ~ % ', cls: 'prompt', cmd: 'git status' },
+      { text: 'On branch main', cls: 'output' },
+      { text: 'nothing to commit, working tree clean', cls: 'output' },
+      { text: '', cls: '' },
+      { text: 'nick@macbook ~ % ', cls: 'prompt', cmd: '' },
+    ];
+
+    function typeEditor() {
+      editorText.innerHTML = '';
+      let lineIdx = 0, charIdx = 0;
+      const cursor = document.createElement('span');
+      cursor.className = 'cursor';
+
+      function tick() {
+        if (lineIdx >= editorLines.length) { editorText.appendChild(cursor); return; }
+        const line = editorLines[lineIdx];
+        if (charIdx === 0 && lineIdx > 0) editorText.appendChild(document.createTextNode('\n'));
+        if (line.text === '') { lineIdx++; charIdx = 0; setTimeout(tick, 40); return; }
+        if (charIdx === 0) {
+          const s = document.createElement('span');
+          s.className = line.cls;
+          s.dataset.l = lineIdx;
+          editorText.appendChild(s);
+        }
+        const s = editorText.querySelector(`[data-l="${lineIdx}"]`);
+        s.textContent = line.text.substring(0, charIdx + 1);
+        if (cursor.parentNode) cursor.remove();
+        s.after(cursor);
+        charIdx++;
+        if (charIdx >= line.text.length) { lineIdx++; charIdx = 0; setTimeout(tick, 55); }
+        else setTimeout(tick, line.cls === 'heading' ? 22 : 16 + Math.random() * 20);
+      }
+      tick();
+    }
+
+    function typeTerminal() {
+      terminalText.innerHTML = '';
+      let i = 0;
+
+      function next() {
+        if (i >= terminalLines.length) return;
+        const line = terminalLines[i];
+
+        if (line.cls === 'prompt') {
+          const ps = document.createElement('span');
+          ps.className = 'prompt';
+          ps.textContent = line.text;
+          terminalText.appendChild(ps);
+
+          if (line.cmd) {
+            let ci = 0;
+            const cs = document.createElement('span');
+            cs.className = 'cmd';
+            terminalText.appendChild(cs);
+            function tc() {
+              cs.textContent = line.cmd.substring(0, ci + 1);
+              ci++;
+              if (ci < line.cmd.length) setTimeout(tc, 30 + Math.random() * 35);
+              else { terminalText.appendChild(document.createTextNode('\n')); i++; setTimeout(next, 280); }
+            }
+            setTimeout(tc, 180);
+          } else {
+            const c = document.createElement('span');
+            c.className = 'cursor';
+            terminalText.appendChild(c);
+          }
+        } else if (line.cls === 'output') {
+          const o = document.createElement('span');
+          o.className = 'output';
+          o.textContent = line.text;
+          terminalText.appendChild(o);
+          terminalText.appendChild(document.createTextNode('\n'));
+          i++;
+          setTimeout(next, 45);
+        } else {
+          terminalText.appendChild(document.createTextNode('\n'));
+          i++;
+          setTimeout(next, 45);
+        }
+      }
+      setTimeout(next, 550);
+    }
+
+    // ─── Ghost cursor hint loop ───
+
+    function positionGhostCursor() {
+      // Place it so the end-point (0,0 of animation) is just below the notch center
+      const notchRect = notch.getBoundingClientRect();
+      ghostCursor.style.left = (notchRect.left + notchRect.width / 2 - 2) + 'px';
+      ghostCursor.style.top = (notchRect.bottom + 8) + 'px';
+    }
+
+    function runHintLoop() {
+      if (hintStopped || hintLoops >= MAX_HINT_LOOPS) return;
+      if (window.innerWidth <= 540) return;
+
+      positionGhostCursor();
+      ghostCursor.classList.remove('animating');
+      // Force reflow to restart animation
+      void ghostCursor.offsetWidth;
+      ghostCursor.classList.add('animating');
+
+      // At 52% of 2.8s = ~1.46s, cursor arrives at notch — trigger peek
+      setTimeout(() => {
+        if (hintStopped) return;
+        notch.classList.add('peeking');
+      }, 1450);
+
+      // At 68% = ~1.9s, start retracting notch
+      setTimeout(() => {
+        notch.classList.remove('peeking');
+      }, 1900);
+
+      // Full cycle done at 2.8s, wait a beat, then loop
+      setTimeout(() => {
+        hintLoops++;
+        ghostCursor.classList.remove('animating');
+        if (hintLoops < MAX_HINT_LOOPS && !hintStopped) {
+          setTimeout(runHintLoop, 1800);
+        }
+      }, 2800);
+    }
+
+    function stopHintLoop() {
+      hintStopped = true;
+      ghostCursor.classList.remove('animating');
+      ghostCursor.style.opacity = '0';
+      notch.classList.remove('peeking');
+    }
+
+    // Start the hint after page animations settle
+    setTimeout(runHintLoop, 2200);
+
+    // ─── Scroll reveal ───
+
+    const scrollEls = document.querySelectorAll('.scroll-reveal');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1 });
+    scrollEls.forEach(el => obs.observe(el));
+
+    // ─── Mobile: show window inline ───
+    if (window.innerWidth <= 540) {
+      macWindow.classList.add('visible');
+      typingStarted = true;
+      setTimeout(() => { typeEditor(); typeTerminal(); }, 500);
+    }
+  </script>
+</body>
+</html>
