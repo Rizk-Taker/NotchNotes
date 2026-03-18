@@ -19,7 +19,7 @@ class OnboardingWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Welcome to NotchPad"
+        window.title = "Welcome to NotchNotes"
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -42,7 +42,7 @@ class OnboardingWindowController: NSWindowController {
     func showHowToUse() {
         window?.contentView = NSHostingView(rootView: OnboardingView(page: .instructions, dismiss: { [weak self] in
             self?.window?.close()
-        }))
+        }, showGetStarted: false))
         window?.title = "How to Use"
         window?.center()
         window?.makeKeyAndOrderFront(nil)
@@ -60,6 +60,7 @@ enum OnboardingPage {
 struct OnboardingView: View {
     @State var page: OnboardingPage
     let dismiss: () -> Void
+    var showGetStarted: Bool = true
 
     var body: some View {
         Group {
@@ -67,7 +68,7 @@ struct OnboardingView: View {
             case .setup:
                 SetupPage(onNext: { page = .instructions })
             case .instructions:
-                InstructionsPage(onDone: dismiss)
+                InstructionsPage(onDone: dismiss, showGetStarted: showGetStarted)
             }
         }
         .frame(width: 520, height: 560)
@@ -86,7 +87,7 @@ struct SetupPage: View {
         VStack(spacing: 0) {
             Spacer().frame(height: 40)
 
-            Text("Welcome to NotchPad")
+            Text("Welcome to NotchNotes")
                 .font(.system(size: 24, weight: .bold))
 
             Text("Let's get you set up")
@@ -170,6 +171,7 @@ struct SetupPage: View {
 
 struct InstructionsPage: View {
     let onDone: () -> Void
+    var showGetStarted: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -216,17 +218,19 @@ struct InstructionsPage: View {
 
             Spacer()
 
-            HStack {
-                Spacer()
-                Button(action: onDone) {
-                    Text("Get Started")
-                        .frame(width: 100)
+            if showGetStarted {
+                HStack {
+                    Spacer()
+                    Button(action: onDone) {
+                        Text("Get Started")
+                            .frame(width: 100)
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .controlSize(.large)
                 }
-                .keyboardShortcut(.return, modifiers: [])
-                .controlSize(.large)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 24)
         }
     }
 

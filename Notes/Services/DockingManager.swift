@@ -130,52 +130,14 @@ class DockingManager {
         // Get the first leaf from source
         guard let sourceLeaf = source.windowState.rootNode.allLeaves.first else { return }
 
-        // Save source frames for positioning
-        let sourceFrame = source.window?.frame ?? .zero
-        let targetFrame = target.window?.frame ?? .zero
-
-        // Calculate merged frame
-        let mergedFrame: NSRect
-        switch edge {
-        case .left:
-            mergedFrame = NSRect(
-                x: min(sourceFrame.minX, targetFrame.minX),
-                y: min(sourceFrame.minY, targetFrame.minY),
-                width: sourceFrame.width + targetFrame.width,
-                height: max(sourceFrame.height, targetFrame.height)
-            )
-        case .right:
-            mergedFrame = NSRect(
-                x: min(sourceFrame.minX, targetFrame.minX),
-                y: min(sourceFrame.minY, targetFrame.minY),
-                width: sourceFrame.width + targetFrame.width,
-                height: max(sourceFrame.height, targetFrame.height)
-            )
-        case .top:
-            mergedFrame = NSRect(
-                x: min(sourceFrame.minX, targetFrame.minX),
-                y: min(sourceFrame.minY, targetFrame.minY),
-                width: max(sourceFrame.width, targetFrame.width),
-                height: sourceFrame.height + targetFrame.height
-            )
-        case .bottom:
-            mergedFrame = NSRect(
-                x: min(sourceFrame.minX, targetFrame.minX),
-                y: min(sourceFrame.minY, targetFrame.minY),
-                width: max(sourceFrame.width, targetFrame.width),
-                height: sourceFrame.height + targetFrame.height
-            )
-        }
-
         // Dock the source pane into the target window state
+        // The target window keeps its current size — the source merges into it
         if let sourceDoc = sourceLeaf.document {
             target.windowState.dock(document: sourceDoc, onto: leafID, edge: edge)
         } else if sourceLeaf.isTerminal {
             target.windowState.dockTerminal(onto: leafID, edge: edge)
         }
 
-        // Resize target window to merged frame
-        target.window?.setFrame(mergedFrame, display: true, animate: true)
         target.rebuildContentView()
 
         // Close source window

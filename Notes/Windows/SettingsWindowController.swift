@@ -47,13 +47,6 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Button("How to Use NotchPad") {
-                    OnboardingWindowController.shared.showHowToUse()
-                }
-                .font(.headline)
-            }
-
             Section("Notes Folder") {
                 HStack {
                     Text(folderPath)
@@ -84,8 +77,20 @@ struct SettingsView: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
             }
+
+            Section {
+                Button(action: {
+                    OnboardingWindowController.shared.showHowToUse()
+                }) {
+                    HStack {
+                        Image(systemName: "keyboard")
+                        Text("Keyboard Shortcuts & How to Use")
+                    }
+                }
+                .buttonStyle(.link)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 420)
+        .frame(width: 450, height: 460)
     }
 }

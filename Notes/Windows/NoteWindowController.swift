@@ -31,18 +31,21 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.minSize = NSSize(width: 250, height: 200)
-        window.title = document.fileURL != nil ? document.displayName : "NotchPad"
+        window.title = document.fileURL != nil ? document.displayName : "NotchNotes"
         window.isReleasedWhenClosed = false
 
         super.init(window: window)
         window.delegate = self
 
-        // Position centered horizontally, near the top of the screen (below notch)
-        if let screen = NSScreen.main {
+        // First window: centered horizontally, near the top. Subsequent windows: cascade.
+        if Self.cascadePoint == NSPoint(x: 200, y: 200), let screen = NSScreen.main {
             let screenFrame = screen.visibleFrame
             let x = screenFrame.midX - windowWidth / 2
             let y = screenFrame.maxY - windowHeight - 40
             window.setFrameOrigin(NSPoint(x: x, y: y))
+            Self.cascadePoint = window.cascadeTopLeft(from: .zero)
+        } else {
+            Self.cascadePoint = window.cascadeTopLeft(from: Self.cascadePoint)
         }
 
         setupContentView()
@@ -59,7 +62,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
             defer: false
         )
         window.minSize = NSSize(width: 250, height: 200)
-        window.title = windowState.focusedDocument?.fileURL != nil ? windowState.focusedDocument?.displayName ?? "NotchPad" : "NotchPad"
+        window.title = windowState.focusedDocument?.fileURL != nil ? windowState.focusedDocument?.displayName ?? "NotchNotes" : "NotchNotes"
         window.isReleasedWhenClosed = false
 
         super.init(window: window)
@@ -116,9 +119,9 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateTitle() {
         if let leaf = windowState.focusedLeaf, leaf.isTerminal {
-            window?.title = "NotchPad — Terminal"
+            window?.title = "NotchNotes — Terminal"
         } else {
-            window?.title = windowState.focusedDocument?.fileURL != nil ? (windowState.focusedDocument?.displayName ?? "NotchPad") : "NotchPad"
+            window?.title = windowState.focusedDocument?.fileURL != nil ? (windowState.focusedDocument?.displayName ?? "NotchNotes") : "NotchNotes"
         }
     }
 
