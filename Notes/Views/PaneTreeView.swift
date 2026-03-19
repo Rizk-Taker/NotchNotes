@@ -28,6 +28,66 @@ class PaneTreeView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    // MARK: - Key Equivalents
+    // Intercept app shortcuts before they reach the terminal view.
+    // TUI apps (e.g. Claude Code) enable the Kitty keyboard protocol which can
+    // prevent menu-bar key equivalents from firing.  By handling them here — at the
+    // content-view level — the shortcuts work regardless of terminal state, matching
+    // iTerm behaviour.
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let flags = event.modifierFlags
+        let hasCmd = flags.contains(.command)
+        let hasShift = flags.contains(.shift)
+        let hasOpt = flags.contains(.option)
+
+        guard hasCmd, let chars = event.charactersIgnoringModifiers?.lowercased() else {
+            return super.performKeyEquivalent(with: event)
+        }
+
+        // ⌘D / ⇧⌘D — split with editor
+        if chars == "d" && !hasOpt {
+            let orientation: SplitOrientation = hasShift ? .horizontal : .vertical
+            windowController?.splitFocusedPane(orientation: orientation)
+            return true
+        }
+
+        // ⌘T / ⇧⌘T — split with terminal
+        if chars == "t" && !hasOpt {
+            let orientation: SplitOrientation = hasShift ? .horizontal : .vertical
+            windowController?.splitFocusedPaneWithTerminal(orientation: orientation)
+            return true
+        }
+
+        // ⌘W — close pane
+        if chars == "w" && !hasShift && !hasOpt {
+            windowController?.closeFocusedPane()
+            return true
+        }
+
+        // ⌥⌘ Arrow — pane navigation
+        if hasOpt, let scalar = chars.unicodeScalars.first {
+            switch Int(scalar.value) {
+            case NSLeftArrowFunctionKey:
+                windowController?.moveFocus(direction: .left)
+                return true
+            case NSRightArrowFunctionKey:
+                windowController?.moveFocus(direction: .right)
+                return true
+            case NSUpArrowFunctionKey:
+                windowController?.moveFocus(direction: .top)
+                return true
+            case NSDownArrowFunctionKey:
+                windowController?.moveFocus(direction: .bottom)
+                return true
+            default:
+                break
+            }
+        }
+
+        return super.performKeyEquivalent(with: event)
+    }
+
     func update(node: PaneNode, focusedLeafID: UUID?) {
         self.node = node
         // Cache terminal views so shell sessions survive rebuilds
