@@ -150,59 +150,6 @@
 
     /* ─── HEADER ─── */
 
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 28px 40px;
-      max-width: 720px;
-      width: 100%;
-      margin: 0 auto;
-      flex-shrink: 0;
-    }
-
-    .wordmark {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 17px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      padding: 7px 16px;
-      border: 1.5px solid #1a1a1a;
-      border-radius: 12px;
-      color: var(--text);
-      opacity: 0;
-      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
-    }
-
-    .wordmark svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    .header-links {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      opacity: 0;
-      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards;
-    }
-
-    .header-links a {
-      color: var(--text-secondary);
-      transition: color 0.2s ease;
-    }
-
-    .header-links a:hover { color: var(--text); }
-
-    .header-links .sep {
-      color: var(--text-tertiary);
-      user-select: none;
-    }
-
     /* ─── HERO ─── */
 
     .hero {
@@ -668,7 +615,6 @@
     /* ─── RESPONSIVE ─── */
 
     @media (max-width: 540px) {
-      header { padding: 24px 24px; }
       .hero { padding: 0 24px 24px; }
       .features { padding: 40px 24px 60px; }
       .bottom { padding: 16px 24px; }
@@ -751,16 +697,6 @@
 
   <!-- Dismiss hint -->
   <div class="dismiss-hint" id="dismiss-hint">esc to close</div>
-
-  <!-- Header -->
-  <header>
-    <a href="/" class="wordmark">notchnotes</a>
-    <div class="header-links">
-      <a href="https://github.com/nickrizk/Notes">github</a>
-      <span class="sep">|</span>
-      <a href="privacy.html">privacy</a>
-    </div>
-  </header>
 
   <!-- Hero -->
   <section class="hero">
@@ -853,7 +789,7 @@
 
   <!-- Footer -->
   <footer class="bottom">
-    built by <a href="https://github.com/nickrizk">nick rizk</a> &middot; <a href="https://github.com/nickrizk/Notes">source</a>
+    built by <a href="https://github.com/nickrizk">nick rizk</a> &middot; <a href="https://github.com/nickrizk/Notes">github</a> &middot; <a href="privacy.html">privacy</a>
   </footer>
 
   <script>
