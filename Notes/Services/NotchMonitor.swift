@@ -46,7 +46,7 @@ class NotchMonitor {
 
     private var notchZone: NSRect {
         guard let screen = NSScreen.main else { return .zero }
-        let notchWidth: CGFloat = 200
+        let notchWidth = screen.notchWidth
         let safeTop = screen.safeAreaInsets.top
         let zoneHeight = max(safeTop, 32)  // Full notch height as the hover zone
         return NSRect(

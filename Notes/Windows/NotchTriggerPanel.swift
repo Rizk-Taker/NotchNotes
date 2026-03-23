@@ -7,20 +7,35 @@
 
 import AppKit
 
+// MARK: - NSScreen notch geometry
+
+extension NSScreen {
+    /// Width of the notch in logical points, computed from the display's physical dimensions.
+    /// The physical notch cutout is ~36 mm on all current Apple notched MacBooks.
+    var notchWidth: CGFloat {
+        guard safeAreaInsets.top > 0,
+              let displayID = deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
+            return 200
+        }
+        let physicalWidth = CGDisplayScreenSize(displayID).width
+        guard physicalWidth > 0 else { return 200 }
+        return ceil((36.0 / physicalWidth) * frame.width)
+    }
+}
+
 /// A floating panel that extends the notch downward with a black region
-/// containing white "create" text — mimicking the notch expanding.
+/// containing white shortcut text — mimicking the notch expanding.
 class NotchTriggerPanel: NSPanel {
 
-    private static let notchWidth: CGFloat = 200
-    private static let extensionHeight: CGFloat = 30
-    private static let cornerRadius: CGFloat = 14
+    private static let extensionHeight: CGFloat = 24
+    private static let cornerRadius: CGFloat = 10
 
     init() {
         let screen = NSScreen.main ?? NSScreen.screens[0]
         let safeTop = screen.safeAreaInsets.top
         let notchHeight = max(safeTop, 32)
 
-        let panelWidth = Self.notchWidth
+        let panelWidth = screen.notchWidth
         let panelHeight = notchHeight + Self.extensionHeight
 
         let origin = NSPoint(
