@@ -94,10 +94,14 @@ class NoteEditorView: NSView {
         // Focus indicator (left border)
         focusIndicator.wantsLayer = true
         focusIndicator.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
-        focusIndicator.isHidden = true
+        focusIndicator.alphaValue = 0
 
         addSubview(scrollView)
         addSubview(focusIndicator)
+
+        // Accessibility
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Editor pane — \(document.displayName)")
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         focusIndicator.translatesAutoresizingMaskIntoConstraints = false
@@ -116,7 +120,10 @@ class NoteEditorView: NSView {
     }
 
     private func updateFocusIndicator() {
-        focusIndicator.isHidden = !isFocused
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            focusIndicator.animator().alphaValue = isFocused ? 1 : 0
+        }
     }
 
     func updateFont() {

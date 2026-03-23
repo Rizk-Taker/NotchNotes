@@ -85,8 +85,12 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         window?.contentView = treeView
     }
 
-    func rebuildContentView() {
-        paneTreeView?.update(node: windowState.rootNode, focusedLeafID: windowState.focusedLeafID)
+    func rebuildContentView(animated: Bool = false) {
+        if animated {
+            paneTreeView?.animatedUpdate(node: windowState.rootNode, focusedLeafID: windowState.focusedLeafID)
+        } else {
+            paneTreeView?.update(node: windowState.rootNode, focusedLeafID: windowState.focusedLeafID)
+        }
         updateTitle()
     }
 
@@ -115,6 +119,12 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         for (id, terminalView) in paneTreeView?.terminalViews ?? [:] {
             terminalView.isFocused = (id == focusedID)
         }
+        // Notify VoiceOver of focus change
+        if let editor = paneTreeView?.editorViews[focusedID] {
+            NSAccessibility.post(element: editor, notification: .focusedUIElementChanged)
+        } else if let terminal = paneTreeView?.terminalViews[focusedID] {
+            NSAccessibility.post(element: terminal, notification: .focusedUIElementChanged)
+        }
     }
 
     private func updateTitle() {
@@ -128,26 +138,49 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - Pane Navigation (⌥⌘ Arrow Keys)
 
     func moveFocus(direction: DockEdge) {
-        let leaves = windowState.rootNode.allLeaves
-        guard leaves.count > 1,
-              let currentIndex = leaves.firstIndex(where: { $0.id == windowState.focusedLeafID }) else { return }
+        guard let contentView = window?.contentView,
+              let currentID = windowState.focusedLeafID else { return }
 
-        let nextIndex: Int
-        switch direction {
-        case .right, .bottom:
-            nextIndex = (currentIndex + 1) % leaves.count
-        case .left, .top:
-            nextIndex = (currentIndex - 1 + leaves.count) % leaves.count
+        let rects = windowState.rootNode.layoutRects(in: contentView.bounds)
+        guard let currentRect = rects[currentID] else { return }
+
+        let currentCenter = CGPoint(x: currentRect.midX, y: currentRect.midY)
+
+        // Find leaves in the requested direction, pick the nearest
+        var bestID: UUID?
+        var bestDistance: CGFloat = .greatestFiniteMagnitude
+
+        for (leafID, rect) in rects {
+            guard leafID != currentID else { continue }
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+
+            let isInDirection: Bool
+            switch direction {
+            case .left:   isInDirection = center.x < currentCenter.x
+            case .right:  isInDirection = center.x > currentCenter.x
+            case .top:    isInDirection = center.y > currentCenter.y
+            case .bottom: isInDirection = center.y < currentCenter.y
+            }
+            guard isInDirection else { continue }
+
+            let dx = center.x - currentCenter.x
+            let dy = center.y - currentCenter.y
+            let distance = sqrt(dx * dx + dy * dy)
+
+            if distance < bestDistance {
+                bestDistance = distance
+                bestID = leafID
+            }
         }
 
-        let targetLeaf = leaves[nextIndex]
-        windowState.focusedLeafID = targetLeaf.id
+        guard let targetID = bestID else { return }
+        windowState.focusedLeafID = targetID
         rebuildContentView()
 
         // Focus the appropriate view type
-        if let editor = paneTreeView?.editorViews[targetLeaf.id] {
+        if let editor = paneTreeView?.editorViews[targetID] {
             editor.focus()
-        } else if let terminal = paneTreeView?.terminalViews[targetLeaf.id] {
+        } else if let terminal = paneTreeView?.terminalViews[targetID] {
             terminal.focus()
         }
     }
@@ -159,7 +192,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         let newDoc = NoteDocument()
         let edge: DockEdge = (orientation == .vertical) ? .right : .bottom
         windowState.dock(document: newDoc, onto: leafID, edge: edge)
-        rebuildContentView()
+        rebuildContentView(animated: true)
 
         // Focus the new pane's text view
         if let newLeafID = windowState.focusedLeafID,
@@ -172,7 +205,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
         guard let leafID = windowState.focusedLeafID else { return }
         let edge: DockEdge = (orientation == .vertical) ? .right : .bottom
         windowState.dockTerminal(onto: leafID, edge: edge)
-        rebuildContentView()
+        rebuildContentView(animated: true)
 
         if let newLeafID = windowState.focusedLeafID,
            let terminal = paneTreeView?.terminalViews[newLeafID] {
@@ -237,7 +270,7 @@ class NoteWindowController: NSWindowController, NSWindowDelegate {
             window?.close()
         } else {
             windowState.removePane(leafID: leafID)
-            rebuildContentView()
+            rebuildContentView(animated: true)
         }
     }
 

@@ -7,12 +7,20 @@
 
 import AppKit
 
-/// A thin draggable divider between panes
+/// A thin draggable divider between panes with a wide invisible grab zone
 class PaneDividerView: NSView {
     let orientation: SplitOrientation
     var onDrag: ((CGFloat) -> Void)?
+    var onDoubleClick: (() -> Void)?
 
     private var lastDragLocation: CGFloat = 0
+    private var trackingArea: NSTrackingArea?
+    private var isHovered = false
+
+    /// Visual thickness of the divider line
+    static let visualThickness: CGFloat = 3
+    /// Invisible grab zone extends this far on each side of the visual divider
+    private static let grabPadding: CGFloat = 4.5  // total hit zone = 3 + 4.5*2 = 12
 
     init(orientation: SplitOrientation) {
         self.orientation = orientation
@@ -25,15 +33,78 @@ class PaneDividerView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func resetCursorRects() {
-        discardCursorRects()
+    // MARK: - Hit Testing (expanded grab zone)
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let expandedBounds: NSRect
         switch orientation {
         case .vertical:
-            addCursorRect(bounds, cursor: .resizeLeftRight)
+            expandedBounds = bounds.insetBy(dx: -Self.grabPadding, dy: 0)
         case .horizontal:
-            addCursorRect(bounds, cursor: .resizeUpDown)
+            expandedBounds = bounds.insetBy(dx: 0, dy: -Self.grabPadding)
+        }
+        let localPoint = convert(point, from: superview)
+        if expandedBounds.contains(localPoint) {
+            return self
+        }
+        return nil
+    }
+
+    // MARK: - Tracking Area (hover highlight)
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingArea {
+            removeTrackingArea(existing)
+        }
+        let expandedRect: NSRect
+        switch orientation {
+        case .vertical:
+            expandedRect = bounds.insetBy(dx: -Self.grabPadding, dy: 0)
+        case .horizontal:
+            expandedRect = bounds.insetBy(dx: 0, dy: -Self.grabPadding)
+        }
+        trackingArea = NSTrackingArea(
+            rect: expandedRect,
+            options: [.mouseEnteredAndExited, .activeInKeyWindow],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea!)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            self.animator().layer?.backgroundColor = NSColor.selectedControlColor.cgColor
         }
     }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            self.animator().layer?.backgroundColor = NSColor.separatorColor.cgColor
+        }
+    }
+
+    // MARK: - Cursor
+
+    override func resetCursorRects() {
+        discardCursorRects()
+        let expandedRect: NSRect
+        switch orientation {
+        case .vertical:
+            expandedRect = bounds.insetBy(dx: -Self.grabPadding, dy: 0)
+            addCursorRect(expandedRect, cursor: .resizeLeftRight)
+        case .horizontal:
+            expandedRect = bounds.insetBy(dx: 0, dy: -Self.grabPadding)
+            addCursorRect(expandedRect, cursor: .resizeUpDown)
+        }
+    }
+
+    // MARK: - Mouse Drag
 
     override func mouseDown(with event: NSEvent) {
         let location = convert(event.locationInWindow, from: nil)
@@ -53,5 +124,13 @@ class PaneDividerView: NSView {
             delta = location.y - lastDragLocation
         }
         onDrag?(delta)
+    }
+
+    // MARK: - Double Click to Equalize
+
+    override func mouseUp(with event: NSEvent) {
+        if event.clickCount == 2 {
+            onDoubleClick?()
+        }
     }
 }
