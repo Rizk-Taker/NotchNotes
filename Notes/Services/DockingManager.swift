@@ -138,7 +138,7 @@ class DockingManager {
             target.windowState.dockTerminal(onto: leafID, edge: edge)
         }
 
-        target.rebuildContentView()
+        target.rebuildContentView(animated: true)
 
         // Close source window
         source.window?.close()

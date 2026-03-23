@@ -64,6 +64,11 @@ class WindowState {
         focusedLeafID = newLeaf.id
     }
 
+    /// Updates the ratio of a specific split node in the tree.
+    func updateSplitRatio(splitID: UUID, ratio: CGFloat) {
+        rootNode = rootNode.updatingRatio(splitID: splitID, newRatio: ratio)
+    }
+
     /// Removes a pane from the tree
     func removePane(leafID: UUID) {
         if let newRoot = rootNode.removing(leafID: leafID) {

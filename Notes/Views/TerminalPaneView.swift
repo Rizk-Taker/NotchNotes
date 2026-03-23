@@ -35,10 +35,14 @@ class TerminalPaneView: NSView {
         // Focus indicator (left border) — same pattern as NoteEditorView
         focusIndicator.wantsLayer = true
         focusIndicator.layer?.backgroundColor = NSColor.controlAccentColor.cgColor
-        focusIndicator.isHidden = true
+        focusIndicator.alphaValue = 0
 
         addSubview(focusIndicator)
         addSubview(terminalView)
+
+        // Accessibility
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Terminal pane")
 
         // Hide the terminal's built-in vertical scroller to match NoteEditorView behavior.
         // SwiftTerm adds an NSScroller directly as a subview of TerminalView.
@@ -89,7 +93,10 @@ class TerminalPaneView: NSView {
     }
 
     private func updateFocusIndicator() {
-        focusIndicator.isHidden = !isFocused
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            focusIndicator.animator().alphaValue = isFocused ? 1 : 0
+        }
     }
 
     private func setupClickMonitor() {

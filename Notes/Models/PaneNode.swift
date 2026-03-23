@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreGraphics
 
 indirect enum PaneNode: Identifiable {
     case leaf(PaneLeaf)
@@ -132,4 +133,83 @@ struct PaneSplit: Identifiable {
 enum SplitOrientation {
     case horizontal  // top/bottom
     case vertical    // left/right
+}
+
+// MARK: - Layout Geometry
+
+extension PaneNode {
+    /// Computes the layout rectangle of every leaf node given the available bounds.
+    /// Uses the same geometry as PaneSplitView: for a vertical split with ratio `r`
+    /// in width `W`, first child gets `r * (W - dividerThickness)`, divider gets
+    /// `dividerThickness`, second child gets the remainder.
+    func layoutRects(in bounds: CGRect, dividerThickness: CGFloat = 3) -> [UUID: CGRect] {
+        switch self {
+        case .leaf(let leaf):
+            return [leaf.id: bounds]
+        case .split(let split):
+            let (firstBounds, secondBounds) = splitBounds(
+                bounds: bounds,
+                orientation: split.orientation,
+                ratio: split.ratio,
+                dividerThickness: dividerThickness
+            )
+            var rects = split.first.layoutRects(in: firstBounds, dividerThickness: dividerThickness)
+            let secondRects = split.second.layoutRects(in: secondBounds, dividerThickness: dividerThickness)
+            for (id, rect) in secondRects {
+                rects[id] = rect
+            }
+            return rects
+        }
+    }
+
+    private func splitBounds(
+        bounds: CGRect,
+        orientation: SplitOrientation,
+        ratio: CGFloat,
+        dividerThickness: CGFloat
+    ) -> (CGRect, CGRect) {
+        switch orientation {
+        case .vertical:
+            let firstWidth = ratio * (bounds.width - dividerThickness)
+            let secondWidth = (1 - ratio) * (bounds.width - dividerThickness)
+            let first = CGRect(x: bounds.minX, y: bounds.minY,
+                             width: firstWidth, height: bounds.height)
+            let second = CGRect(x: bounds.minX + firstWidth + dividerThickness, y: bounds.minY,
+                              width: secondWidth, height: bounds.height)
+            return (first, second)
+        case .horizontal:
+            let firstHeight = ratio * (bounds.height - dividerThickness)
+            let secondHeight = (1 - ratio) * (bounds.height - dividerThickness)
+            let first = CGRect(x: bounds.minX, y: bounds.minY + secondHeight + dividerThickness,
+                             width: bounds.width, height: firstHeight)
+            let second = CGRect(x: bounds.minX, y: bounds.minY,
+                              width: bounds.width, height: secondHeight)
+            return (first, second)
+        }
+    }
+
+    /// Returns a new tree with the split ratio updated for the given split ID.
+    func updatingRatio(splitID: UUID, newRatio: CGFloat) -> PaneNode {
+        switch self {
+        case .leaf:
+            return self
+        case .split(let split):
+            if split.id == splitID {
+                return .split(PaneSplit(
+                    id: split.id,
+                    orientation: split.orientation,
+                    ratio: newRatio,
+                    first: split.first,
+                    second: split.second
+                ))
+            }
+            return .split(PaneSplit(
+                id: split.id,
+                orientation: split.orientation,
+                ratio: split.ratio,
+                first: split.first.updatingRatio(splitID: splitID, newRatio: newRatio),
+                second: split.second.updatingRatio(splitID: splitID, newRatio: newRatio)
+            ))
+        }
+    }
 }
