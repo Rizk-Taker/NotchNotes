@@ -55,7 +55,7 @@ class NotchTriggerPanel: NSPanel {
         )
 
         // White text positioned in the extension area (bottom portion of the panel)
-        let label = NSTextField(labelWithString: "press enter to create")
+        let label = NSTextField(labelWithString: "⏎ note  ⇧⌘⏎ terminal")
         label.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         label.textColor = NSColor.white.withAlphaComponent(0.9)
         label.alignment = .center
