@@ -78,6 +78,8 @@ class NotchTriggerPanel: NSPanel {
     }
 
     func showAnimated() {
+        // Force layout before showing to prevent label flashing at (0,0)
+        contentView?.layoutSubtreeIfNeeded()
         orderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.2
